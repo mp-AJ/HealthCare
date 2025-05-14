@@ -16,5 +16,5 @@ else:
     st.sidebar.success("Logged in as: " + st.session_state.get("username", ""))
     if st.sidebar.button("Logout"):
         logout()
-    st.title("🏥 Welcome to the Healthcare Streamlit App")
+    st.title("🏥 Welcome to the Healthcare App")
     st.write("Use the sidebar to navigate to different sections.")
