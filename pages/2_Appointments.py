@@ -4,7 +4,7 @@ from db import get_connection
 def load_appointments():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM appointments")
+    cursor.execute("SELECT patient_name, date, doctor FROM appointments")
     rows = cursor.fetchall()
     conn.close()
     return rows
