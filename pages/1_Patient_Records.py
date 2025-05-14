@@ -4,7 +4,7 @@ from db import get_connection
 def load_patients():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM patients")
+    cursor.execute("SELECT name, age, gender, diagnosis FROM patients")
     rows = cursor.fetchall()
     conn.close()
     return rows
