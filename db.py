@@ -26,5 +26,6 @@ def init_db():
         doctor TEXT
     )""")
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'admin', 'admin')")
+    cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES ('user', 'user', 'user')")
     conn.commit()
     conn.close()
