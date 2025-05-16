@@ -18,7 +18,7 @@ def add_patient(name, age, gender, diagnosis):
     conn.close()
 
 with st.sidebar:
-    "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    "[![Open in GitHub Codespaces](https://github.com/codespaces/tree.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
 
 
 
