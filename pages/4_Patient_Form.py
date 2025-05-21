@@ -46,16 +46,24 @@ if search:
     query += f" WHERE patient_name LIKE '%{search}%'"
 df = pd.read_sql(query, conn)
 
-# Display table
+# Display table and details
 if not df.empty:
     st.dataframe(df[['date', 'description', 'status']])
     selected = st.selectbox("Select a record for details", df['id'])
     selected_record = df[df['id'] == selected].iloc[0]
+
     st.subheader("📌 Detail")
     st.write(f"**Patient:** {selected_record['patient_name']}")
     st.write(f"**Date:** {selected_record['date']}")
     st.write(f"**Description:** {selected_record['description']}")
     st.write(f"**Status:** {selected_record['status']}")
+
+    # Delete button
+    if st.button("🗑️ Delete this record"):
+        cursor.execute("DELETE FROM patient_status WHERE id = ?", (selected,))
+        conn.commit()
+        st.success("Record deleted successfully!")
+        st.experimental_rerun()  # Refresh the app to update the data shown
 else:
     st.info("No records found.")
 
