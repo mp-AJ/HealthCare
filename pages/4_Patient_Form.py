@@ -1,52 +1,64 @@
 import streamlit as st
 import sqlite3
+import pandas as pd
 
-st.title("📝 Add Detailed Patient Form")
-
-# Connect to database
+# Connect to DB
 conn = sqlite3.connect('healthcare.db', check_same_thread=False)
 cursor = conn.cursor()
 
 # Create table if not exists
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS detailed_patients (
+CREATE TABLE IF NOT EXISTS patient_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    age INTEGER,
-    gender TEXT,
-    address TEXT,
-    phone TEXT,
-    complaint TEXT,
-    diagnosis TEXT,
-    treatment TEXT
+    patient_name TEXT,
+    date TEXT,
+    description TEXT,
+    status TEXT
 )
 """)
 conn.commit()
 
-with st.form("patient_form"):
-    col1, col2 = st.columns(2)
+# Sidebar for Add/Edit
+st.sidebar.title("🔧 Patient Actions")
+action = st.sidebar.radio("Choose Action", ["Add New", "Edit Existing"])
 
-    with col1:
-        name = st.text_input("Patient Name")
-        age = st.number_input("Age", min_value=0, max_value=120)
-        gender = st.radio("Gender", ["Male", "Female", "Other"])
+if action == "Add New":
+    with st.sidebar.form("add_form"):
+        patient = st.text_input("Patient Name")
+        date = st.date_input("Date")
+        desc = st.text_area("Description")
+        status = st.selectbox("Status", ["Pending", "In Progress", "Completed"])
+        submit = st.form_submit_button("Save")
+        if submit:
+            cursor.execute("INSERT INTO patient_status (patient_name, date, description, status) VALUES (?, ?, ?, ?)",
+                           (patient, date.isoformat(), desc, status))
+            conn.commit()
+            st.success("✅ Patient status added.")
 
-    with col2:
-        address = st.text_area("Address")
-        phone = st.text_input("Phone Number")
+# Main Layout
+st.title("📋 Patient Status Board")
 
-    complaint = st.text_area("Chief Complaint")
-    diagnosis = st.text_area("Diagnosis")
-    treatment = st.text_area("Treatment Plan")
+# Search
+search = st.text_input("Search by patient name")
 
-    submitted = st.form_submit_button("Submit")
+query = "SELECT * FROM patient_status"
+if search:
+    query += f" WHERE patient_name LIKE '%{search}%'"
+df = pd.read_sql(query, conn)
 
-    if submitted:
-        cursor.execute("""
-            INSERT INTO detailed_patients (name, age, gender, address, phone, complaint, diagnosis, treatment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (name, age, gender, address, phone, complaint, diagnosis, treatment))
-        conn.commit()
-        st.success("✅ Patient record added successfully.")
+# Display table
+if not df.empty:
+    st.dataframe(df[['date', 'description', 'status']])
+    selected = st.selectbox("Select a record for details", df['id'])
+    selected_record = df[df['id'] == selected].iloc[0]
+    st.subheader("📌 Detail")
+    st.write(f"**Patient:** {selected_record['patient_name']}")
+    st.write(f"**Date:** {selected_record['date']}")
+    st.write(f"**Description:** {selected_record['description']}")
+    st.write(f"**Status:** {selected_record['status']}")
+else:
+    st.info("No records found.")
 
-conn.close()
+# Right-aligned Logout (simulate)
+st.sidebar.markdown("---")
+st.sidebar.button("🔒 Logout")
