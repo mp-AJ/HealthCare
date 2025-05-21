@@ -38,30 +38,39 @@ if action == "Add New":
             st.experimental_rerun()
 
 elif action == "Edit Existing":
-    # Fetch all records for selection
-    df_all = pd.read_sql("SELECT * FROM patient_status", conn)
-    if df_all.empty:
-        st.sidebar.info("No records to edit.")
-    else:
-        selected_id = st.sidebar.selectbox("Select record to edit", df_all['id'])
-        record = df_all[df_all['id'] == selected_id].iloc[0]
+    search_edit = st.sidebar.text_input("Search patient by name")
+    if search_edit:
+        query_edit = "SELECT * FROM patient_status WHERE patient_name LIKE ?"
+        df_edit = pd.read_sql(query_edit, conn, params=(f"%{search_edit}%",))
+        
+        if df_edit.empty:
+            st.sidebar.info("No matching records found.")
+        else:
+            # Create options with patient name, date and ID for clarity
+            options = df_edit.apply(lambda row: f"{row['patient_name']} | {row['date']} | ID:{row['id']}", axis=1)
+            selected_option = st.sidebar.selectbox("Select record to edit", options)
 
-        with st.sidebar.form("edit_form"):
-            patient = st.text_input("Patient Name", record['patient_name'])
-            date = st.date_input("Date", pd.to_datetime(record['date']))
-            desc = st.text_area("Description", record['description'])
-            status = st.selectbox("Status", ["Pending", "In Progress", "Completed"],
-                                  index=["Pending", "In Progress", "Completed"].index(record['status']))
-            submit_edit = st.form_submit_button("Update")
-            if submit_edit:
-                cursor.execute("""
-                    UPDATE patient_status 
-                    SET patient_name = ?, date = ?, description = ?, status = ?
-                    WHERE id = ?
-                """, (patient, date.isoformat(), desc, status, selected_id))
-                conn.commit()
-                st.success("✅ Patient status updated.")
-                st.experimental_rerun()
+            selected_id = int(selected_option.split("ID:")[1])
+            record = df_edit[df_edit['id'] == selected_id].iloc[0]
+
+            with st.sidebar.form("edit_form"):
+                patient = st.text_input("Patient Name", record['patient_name'])
+                date = st.date_input("Date", pd.to_datetime(record['date']))
+                desc = st.text_area("Description", record['description'])
+                status = st.selectbox("Status", ["Pending", "In Progress", "Completed"],
+                                      index=["Pending", "In Progress", "Completed"].index(record['status']))
+                submit_edit = st.form_submit_button("Update")
+                if submit_edit:
+                    cursor.execute("""
+                        UPDATE patient_status 
+                        SET patient_name = ?, date = ?, description = ?, status = ?
+                        WHERE id = ?
+                    """, (patient, date.isoformat(), desc, status, selected_id))
+                    conn.commit()
+                    st.success("✅ Patient status updated.")
+                    st.experimental_rerun()
+    else:
+        st.sidebar.info("Enter patient name to search for editing.")
 
 # Main Layout
 st.title("📋 Patient Status Board")
