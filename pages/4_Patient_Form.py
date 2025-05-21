@@ -18,12 +18,17 @@ CREATE TABLE IF NOT EXISTS patient_status (
 """)
 conn.commit()
 
+# Session state for refresh triggers
+if 'data_changed' not in st.session_state:
+    st.session_state.data_changed = False
+
 # Sidebar for Add/Edit
 st.sidebar.title("🔧 Patient Actions")
 action = st.sidebar.radio("Choose Action", ["Add New", "Edit Existing"])
 
+# --- ADD NEW ---
 if action == "Add New":
-    with st.sidebar.form("add_form"):
+    with st.sidebar.form("add_form", clear_on_submit=True):
         patient = st.text_input("Patient Name")
         date = st.date_input("Date")
         desc = st.text_area("Description")
@@ -34,47 +39,66 @@ if action == "Add New":
                 "INSERT INTO patient_status (patient_name, date, description, status) VALUES (?, ?, ?, ?)",
                 (patient, date.isoformat(), desc, status))
             conn.commit()
-            st.success("✅ Patient status added.")
-            st.experimental_rerun()
+            st.session_state.data_changed = True
+            st.sidebar.success("✅ Patient status added.")
 
+# --- EDIT EXISTING ---
 elif action == "Edit Existing":
-    # Fetch all records for selection
-    df_all = pd.read_sql("SELECT * FROM patient_status", conn)
-    if df_all.empty:
-        st.sidebar.info("No records to edit.")
-    else:
-        selected_id = st.sidebar.selectbox("Select record to edit", df_all['id'])
-        record = df_all[df_all['id'] == selected_id].iloc[0]
+    search_edit = st.sidebar.text_input("Search by patient name")
+    if search_edit:
+        df_edit = pd.read_sql(
+            "SELECT * FROM patient_status WHERE patient_name LIKE ?",
+            conn,
+            params=(f"%{search_edit}%",)
+        )
 
-        with st.sidebar.form("edit_form"):
-            patient = st.text_input("Patient Name", record['patient_name'])
-            date = st.date_input("Date", pd.to_datetime(record['date']))
-            desc = st.text_area("Description", record['description'])
-            status = st.selectbox("Status", ["Pending", "In Progress", "Completed"],
-                                  index=["Pending", "In Progress", "Completed"].index(record['status']))
-            submit_edit = st.form_submit_button("Update")
-            if submit_edit:
-                cursor.execute("""
-                    UPDATE patient_status 
-                    SET patient_name = ?, date = ?, description = ?, status = ?
-                    WHERE id = ?
-                """, (patient, date.isoformat(), desc, status, selected_id))
-                conn.commit()
-                st.success("✅ Patient status updated.")
-                st.experimental_rerun()
+        if df_edit.empty:
+            st.sidebar.info("No matching records.")
+        else:
+            selected_id = st.sidebar.selectbox(
+                "Select Record ID to Edit",
+                df_edit["id"],
+                format_func=lambda x: f"{df_edit[df_edit['id'] == x]['patient_name'].values[0]} (ID {x})"
+            )
+            record = df_edit[df_edit['id'] == selected_id].iloc[0]
 
-# Main Layout
+            with st.sidebar.form("edit_form"):
+                patient = st.text_input("Patient Name", record['patient_name'])
+                date = st.date_input("Date", pd.to_datetime(record['date']))
+                desc = st.text_area("Description", record['description'])
+                status = st.selectbox(
+                    "Status", ["Pending", "In Progress", "Completed"],
+                    index=["Pending", "In Progress", "Completed"].index(record['status'])
+                )
+                submit_edit = st.form_submit_button("Update")
+                if submit_edit:
+                    cursor.execute("""
+                        UPDATE patient_status 
+                        SET patient_name = ?, date = ?, description = ?, status = ?
+                        WHERE id = ?
+                    """, (patient, date.isoformat(), desc, status, selected_id))
+                    conn.commit()
+                    st.session_state.data_changed = True
+                    st.sidebar.success("✅ Patient status updated.")
+
+# --- MAIN DISPLAY ---
 st.title("📋 Patient Status Board")
 
-# Search
+# Refresh data if changed
+if st.session_state.data_changed:
+    st.session_state.data_changed = False
+
+# Search bar
 search = st.text_input("Search by patient name")
-
 query = "SELECT * FROM patient_status"
+params = ()
 if search:
-    query += f" WHERE patient_name LIKE '%{search}%'"
-df = pd.read_sql(query, conn)
+    query += " WHERE patient_name LIKE ?"
+    params = (f"%{search}%",)
 
-# Display table and details
+df = pd.read_sql(query, conn, params=params)
+
+# Display results
 if not df.empty:
     st.dataframe(df[['date', 'description', 'status']])
     selected = st.selectbox("Select a record for details", df['id'])
@@ -86,15 +110,16 @@ if not df.empty:
     st.write(f"**Description:** {selected_record['description']}")
     st.write(f"**Status:** {selected_record['status']}")
 
-    # Delete button
+    # Delete confirmation
     if st.button("🗑️ Delete this record"):
-        cursor.execute("DELETE FROM patient_status WHERE id = ?", (selected,))
-        conn.commit()
-        st.success("Record deleted successfully!")
-        st.experimental_rerun()  # Refresh the app to update the data shown
+        if st.checkbox("Confirm delete?"):
+            cursor.execute("DELETE FROM patient_status WHERE id = ?", (selected,))
+            conn.commit()
+            st.session_state.data_changed = True
+            st.success("✅ Record deleted.")
 else:
     st.info("No records found.")
 
-# Right-aligned Logout (simulate)
+# Simulated logout
 st.sidebar.markdown("---")
 st.sidebar.button("🔒 Logout")
