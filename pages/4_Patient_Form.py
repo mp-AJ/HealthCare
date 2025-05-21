@@ -30,10 +30,38 @@ if action == "Add New":
         status = st.selectbox("Status", ["Pending", "In Progress", "Completed"])
         submit = st.form_submit_button("Save")
         if submit:
-            cursor.execute("INSERT INTO patient_status (patient_name, date, description, status) VALUES (?, ?, ?, ?)",
-                           (patient, date.isoformat(), desc, status))
+            cursor.execute(
+                "INSERT INTO patient_status (patient_name, date, description, status) VALUES (?, ?, ?, ?)",
+                (patient, date.isoformat(), desc, status))
             conn.commit()
             st.success("✅ Patient status added.")
+            st.experimental_rerun()
+
+elif action == "Edit Existing":
+    # Fetch all records for selection
+    df_all = pd.read_sql("SELECT * FROM patient_status", conn)
+    if df_all.empty:
+        st.sidebar.info("No records to edit.")
+    else:
+        selected_id = st.sidebar.selectbox("Select record to edit", df_all['id'])
+        record = df_all[df_all['id'] == selected_id].iloc[0]
+
+        with st.sidebar.form("edit_form"):
+            patient = st.text_input("Patient Name", record['patient_name'])
+            date = st.date_input("Date", pd.to_datetime(record['date']))
+            desc = st.text_area("Description", record['description'])
+            status = st.selectbox("Status", ["Pending", "In Progress", "Completed"],
+                                  index=["Pending", "In Progress", "Completed"].index(record['status']))
+            submit_edit = st.form_submit_button("Update")
+            if submit_edit:
+                cursor.execute("""
+                    UPDATE patient_status 
+                    SET patient_name = ?, date = ?, description = ?, status = ?
+                    WHERE id = ?
+                """, (patient, date.isoformat(), desc, status, selected_id))
+                conn.commit()
+                st.success("✅ Patient status updated.")
+                st.experimental_rerun()
 
 # Main Layout
 st.title("📋 Patient Status Board")
